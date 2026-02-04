@@ -83,7 +83,7 @@ def kernel_from_rref {a b}
   kernel_from_rref_aux m pivots (b - 1) (by simp [NeZero.pos])
 
 def demo_mat : Matrix (Fin 5) (Fin 6) (ZMod 2) :=
-  ![![1, 0, 0, 1, 1, 1],
+  ![![1, 0, 0, 0, 1, 0],
     ![0, 1, 1, 0, 1 ,0],
     ![0, 0, 0, 1, 0 ,0],
     ![0, 0, 0, 0, 0 ,1],
@@ -92,33 +92,9 @@ def demo_mat : Matrix (Fin 5) (Fin 6) (ZMod 2) :=
 def demo_pivots : @pivot_t 5 6 where
   rk := 4
   locs := ![0, 1, 3, 5]
-  locs_increasing := by sorry
-  le_dim_rank := by sorry
+  locs_increasing := by
+    intros i j
+    fin_cases i <;> fin_cases j <;> simp
+  le_dim_rank := by simp
 
 #eval! kernel_from_rref demo_mat demo_pivots
-
-/-
-
-def test_fun : Fin 2 -> Fin 5 := ![2, 3]
-
-def test_mem : Bool := 1 ∈ Finset.image test_fun Finset.univ
-
-def test_ite y :=
-  if h : (y ∈ Finset.image test_fun Finset.univ) then
-    let y' : Set.range test_fun := ⟨y, by
-      rw [Finset.mem_image] at h
-      rcases h with ⟨x, hL, hR⟩
-      exists x⟩
-    let x := Function.Injective.invOfMemRange (by sorry) y'
-    true
-  else
-    false
-
-
-
-def lst : List ℕ := [11, 22, 33, 44]
-
-lemma test_decide (i j : Fin 4) :
-  (i < j) -> lst[i] < lst[j] := by
-  fin_cases i <;> fin_cases j <;> simp [lst]
-  -/
