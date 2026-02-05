@@ -12,13 +12,13 @@ import Mathlib.LinearAlgebra.Matrix.Rank
 structure pivot_t {a b : ℕ} where
   rk : ℕ
   locs : Fin rk → Fin b
-  locs_increasing :
-    forall (i j : Fin rk), (i < j -> locs i < locs j)
+  locs_increasing : StrictMono locs
   le_dim_rank : rk ≤ a
 
+-- Aristotle
 lemma pivot_locs_injective {a b} (p : @pivot_t a b) :
   Function.Injective p.locs := by
-  sorry
+  apply p.locs_increasing.injective
 
 def pivots_are_1s {a b}
   [NeZero a] [NeZero b]
@@ -39,7 +39,7 @@ def is_rref_with_pivots {a b}
   (pivots : @pivot_t a b) :=
   pivots_are_1s m pivots /\
   match pivots with
-  | ⟨0, _, _, _⟩ => True
+  | ⟨0, _, _, _⟩ => (m = 0)
   | ⟨rk₀ + 1, locs, _, le_dim_rank⟩ =>
     -- all 0s before first pivot
     (forall j, j < locs 0 -> forall i, m i j = 0) /\
@@ -57,6 +57,7 @@ def is_rref_with_pivots {a b}
       (locs rk₀' ≤ j) ->
       (m.is_zeroes_below i j))
 
+-- TODO edge case fixed, let Aristotle try again
 #check Matrix.rank_eq_finrank_span_row
 lemma pivot_rank_correct {a b}
   [NeZero a] [NeZero b]
@@ -72,9 +73,9 @@ def kernel_from_non_pivot {a b}
   (j : Fin b) (i : Fin b) : ZMod 2 :=
   if i == j then 1
   else if is_pivot : i ∈ Finset.image pivots.locs Finset.univ then
-    let i' : Set.range pivots.locs := ⟨i, by sorry⟩
-    let x := Function.Injective.invOfMemRange (by sorry) i'
-    let xr : Fin a := Fin.castLE (by sorry) x
+    let i' : Set.range pivots.locs := ⟨i, by grind⟩
+    let x := Function.Injective.invOfMemRange (by apply pivot_locs_injective) i'
+    let xr : Fin a := Fin.castLE pivots.le_dim_rank x
     m xr j
   else 0
 
@@ -93,7 +94,7 @@ def ker_from_rref_aux {a b}
   (j : ℕ) (lt_j_b : j < b) : List (Fin b -> ZMod 2) :=
   let tail := match j with
   | 0 => []
-  | j₀ + 1 => ker_from_rref_aux m pivots j₀ (by sorry)
+  | j₀ + 1 => ker_from_rref_aux m pivots j₀ (by apply Nat.lt_of_succ_lt lt_j_b)
   let jfin : Fin b := Fin.ofNat b j
   if jfin ∈ Finset.image pivots.locs Finset.univ then
     tail
@@ -150,4 +151,4 @@ def demo_pivots : @pivot_t 5 6 where
     intros i j; fin_cases i <;> fin_cases j <;> simp
   le_dim_rank := by simp
 
-#eval! ker_from_rref demo_mat demo_pivots
+#eval ker_from_rref demo_mat demo_pivots
