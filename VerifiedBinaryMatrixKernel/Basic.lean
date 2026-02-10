@@ -137,6 +137,7 @@ lemma ker_from_rref_correct {a b}
   m.toLin'.ker = Submodule.span (ZMod 2) (ker_from_rref m pivots).toFinset := by
   sorry
 
+/-
 def demo_mat : Matrix (Fin 5) (Fin 6) (ZMod 2) :=
   ![![1, 0, 0, 0, 1, 0],
     ![0, 1, 1, 0, 1, 0],
@@ -152,3 +153,111 @@ def demo_pivots : @pivot_t 5 6 where
   le_dim_rank := by simp
 
 #eval ker_from_rref demo_mat demo_pivots
+
+lemma demo_pivot_correct :
+  is_rref_with_pivots demo_mat demo_pivots := by
+  constructor
+  · simp [pivots_are_1s, demo_mat, demo_pivots]
+    intro i
+    fin_cases i <;> simp
+  simp [demo_pivots]
+  constructor
+  · intros i j
+    fin_cases i <;> fin_cases j <;>
+    simp [demo_mat] <;> simp [Matrix.is_zeroes_below] <;>
+    intro i₀ <;> fin_cases i₀ <;> simp
+  · intro j
+    fin_cases j <;> simp
+    simp [demo_mat] <;> simp [Matrix.is_zeroes_below] <;>
+    intro i₀ <;> fin_cases i₀ <;> simp
+-/
+
+-- RREF
+
+def swap_rows {a b} (m : Matrix (Fin a) (Fin b) (ZMod 2)) (i₁ i₂ : Fin a)
+  : Matrix (Fin a) (Fin b) (ZMod 2) :=
+  Matrix.of (fun i j =>
+    if i == i₁ then
+      m i₂ j
+    else if i == i₂ then
+      m i₁ j
+    else m i j)
+
+def add_row_i₁_to_i₂ {a b} (m : Matrix (Fin a) (Fin b) (ZMod 2)) (i₁ i₂ : Fin a)
+  : Matrix (Fin a) (Fin b) (ZMod 2) :=
+  Matrix.of (fun i j =>
+    if i == i₂ then
+      m i₁ j + m i₂ j
+    else m i j)
+
+def try_ensure1_aux {a b}
+  [NeZero a]
+  (m : Matrix (Fin a) (Fin b) (ZMod 2))
+  (i : Fin a) (j : Fin b) (fuel : ℕ)
+  : Matrix (Fin a) (Fin b) (ZMod 2) :=
+  let r : Fin a := Fin.ofNat a (a - 1 - fuel)
+  if m r j == 1 then
+    swap_rows m i r
+  else
+    match fuel with
+    | 0 => m
+    | k + 1 => try_ensure1_aux m i j k
+
+-- Swap rows with below if possible, so an entry becomes 1
+def try_ensure1 {a b}
+  [NeZero a]
+  (m : Matrix (Fin a) (Fin b) (ZMod 2)) (i : Fin a) (j : Fin b) :=
+  try_ensure1_aux m i j (a - i - 2)
+
+def make_1_pivot_aux {a b}
+  [NeZero a]
+  (m : Matrix (Fin a) (Fin b) (ZMod 2))
+  (i : Fin a) (j : Fin b) (k : ℕ) :=
+  let r : Fin a := Fin.ofNat a k
+  let needs_op := r != i && m r j == 1
+  let m_op := add_row_i₁_to_i₂ m i r
+  let m' := if needs_op then m_op else m
+  match k with
+  | 0 => m'
+  | k' + 1 => make_1_pivot_aux m' i j k'
+
+-- Given a leading 1, remove 1s in other rows of the same column through row op
+def make_1_pivot {a b}
+  [NeZero a]
+  (m : Matrix (Fin a) (Fin b) (ZMod 2)) (i : Fin a) (j : Fin b) :=
+  make_1_pivot_aux m i j (a - 1)
+
+def rref_aux {a b}
+  [NeZero a] [NeZero b]
+  (m : Matrix (Fin a) (Fin b) (ZMod 2))
+  (i : Fin a) (fuel : ℕ)
+  : Matrix (Fin a) (Fin b) (ZMod 2) :=
+  let j : Fin b := Fin.ofNat b (b - 1 - fuel)
+  let m1 := try_ensure1 m i j
+  let m' :=
+    if m1 i j == 1 then
+      make_1_pivot m1 i j
+    else
+      m1
+  match fuel with
+  | 0 => m'
+  | f + 1 =>
+    if m1 i j == 1 && i == a - 1 then
+      m'
+    else
+      rref_aux m' (if m1 i j == 1 then i + 1 else i) f
+
+def rref {a b}
+  [NeZero a] [NeZero b]
+  (m : Matrix (Fin a) (Fin b) (ZMod 2)) :=
+  rref_aux m 0 (b - 1)
+
+def test_mat : Matrix (Fin 5) (Fin 7) (ZMod 2) :=
+  ![![0, 1, 0, 1, 0, 1, 1],
+    ![1, 0, 0, 1, 1, 0, 0],
+    ![0, 1, 1, 0, 1, 0, 0],
+    ![1, 0, 1, 1, 0, 1, 1],
+    ![0, 1, 1, 1, 1, 0, 1]]
+
+-- very slow
+-- #eval rref test_mat
