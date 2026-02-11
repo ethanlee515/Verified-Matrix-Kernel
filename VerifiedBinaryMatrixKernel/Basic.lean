@@ -153,23 +153,6 @@ def demo_pivots : @pivot_t 5 6 where
   le_dim_rank := by simp
 
 #eval ker_from_rref demo_mat demo_pivots
-
-lemma demo_pivot_correct :
-  is_rref_with_pivots demo_mat demo_pivots := by
-  constructor
-  · simp [pivots_are_1s, demo_mat, demo_pivots]
-    intro i
-    fin_cases i <;> simp
-  simp [demo_pivots]
-  constructor
-  · intros i j
-    fin_cases i <;> fin_cases j <;>
-    simp [demo_mat] <;> simp [Matrix.is_zeroes_below] <;>
-    intro i₀ <;> fin_cases i₀ <;> simp
-  · intro j
-    fin_cases j <;> simp
-    simp [demo_mat] <;> simp [Matrix.is_zeroes_below] <;>
-    intro i₀ <;> fin_cases i₀ <;> simp
 -/
 
 -- RREF
@@ -227,30 +210,63 @@ def make_1_pivot {a b}
   (m : Matrix (Fin a) (Fin b) (ZMod 2)) (i : Fin a) (j : Fin b) :=
   make_1_pivot_aux m i j (a - 1)
 
+def pivot₀ {a b : ℕ} : @pivot_t a b where
+  rk := 0
+  locs := fun x => nomatch x
+  locs_increasing := by simp [StrictMono]
+  le_dim_rank := by apply zero_le
+
+def v_gt_tail {r b} [NeZero b] (locs : Fin r -> Fin b) (v : ℕ) :=
+  match r with
+  | 0 => true
+  | r₀ + 1 =>
+    v > locs (Fin.ofNat (r₀ + 1) r₀)
+
+def append_to_pivot {a b : ℕ}
+  [NeZero b]
+  (pivot : @pivot_t a b) (v : ℕ)
+  (v_inc : v_gt_tail pivot.locs v)
+  (v_bounded : pivot.rk < a)
+  : @pivot_t a b where
+  rk := pivot.rk + 1
+  locs := fun x => if H: x < pivot.rk then
+    let x' : Fin pivot.rk := Fin.castLT x (by assumption)
+    pivot.locs x'
+  else
+    Fin.ofNat b v
+  locs_increasing := (by sorry)
+  le_dim_rank := (by simp_all only [Order.add_one_le_iff])
+
 def rref_aux {a b}
   [NeZero a] [NeZero b]
   (m : Matrix (Fin a) (Fin b) (ZMod 2))
-  (i : Fin a) (fuel : ℕ)
-  : Matrix (Fin a) (Fin b) (ZMod 2) :=
+  (pivot : @pivot_t a b)
+  -- fuel is just (b-j-1), i.e. number of remaining columns
+  -- need to be decreasing for recursion and termination
+  (fuel : ℕ)
+  : Matrix (Fin a) (Fin b) (ZMod 2) × @pivot_t a b :=
+  let i := Fin.ofNat a pivot.rk
   let j : Fin b := Fin.ofNat b (b - 1 - fuel)
   let m1 := try_ensure1 m i j
-  let m' :=
-    if m1 i j == 1 then
-      make_1_pivot m1 i j
-    else
-      m1
-  match fuel with
-  | 0 => m'
-  | f + 1 =>
-    if m1 i j == 1 && i == a - 1 then
-      m'
-    else
-      rref_aux m' (if m1 i j == 1 then i + 1 else i) f
+  if m1 i j == 1 then
+    let pivot' := append_to_pivot pivot j (by sorry) (by sorry)
+    let m' := make_1_pivot m1 i j
+    match fuel with
+    | 0 => (m', pivot')
+    | f + 1 =>
+      if pivot'.rk = a then
+        (m', pivot')
+      else
+        rref_aux m' pivot' f
+  else
+    match fuel with
+    | 0 => (m1, pivot)
+    | f + 1 => rref_aux m1 pivot f
 
 def rref {a b}
   [NeZero a] [NeZero b]
   (m : Matrix (Fin a) (Fin b) (ZMod 2)) :=
-  rref_aux m 0 (b - 1)
+  rref_aux m pivot₀ (b - 1)
 
 def test_mat : Matrix (Fin 5) (Fin 7) (ZMod 2) :=
   ![![0, 1, 0, 1, 0, 1, 1],
@@ -259,5 +275,9 @@ def test_mat : Matrix (Fin 5) (Fin 7) (ZMod 2) :=
     ![1, 0, 1, 1, 0, 1, 1],
     ![0, 1, 1, 1, 1, 0, 1]]
 
--- very slow
--- #eval rref test_mat
+def test_kernel :=
+  let (m, p) := rref test_mat
+  ker_from_rref m p
+
+-- unbelievably slow
+#eval! test_kernel
